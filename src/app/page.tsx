@@ -1,103 +1,340 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Papa from "papaparse";
+
+type DataPoint = {
+  summary: string;
+  source: string;
+  sector: string;
+  topic: string;
+  date: string;
+  link: string;
+  createdAt: Date;
+};
+
+export default function Page() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const [selectedTopic, setSelectedTopic] = useState(searchParams.get("topic") || "All");
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [dateRange, setDateRange] = useState<"all" | "7days" | "30days" | "year">(
+    (searchParams.get("range") as any) || "all"
+  );
+  const [currentPage, setCurrentPage] = useState(
+    parseInt(searchParams.get("page") || "1", 10)
+  );
+  const itemsPerPage = 10;
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedStat, setSelectedStat] = useState<DataPoint | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
+
+  const topics = ["All", ...Array.from(new Set(dataPoints.map((d) => d.topic)))];
+
+  useEffect(() => {
+    const csvUrl =
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vRcLWviAhPQSQ1iKYxFF1EjVpIWpzKv-Hfsw3KXPnvwMLA_F42y5aHAGhBJnHimMgeYoUqorn5WKqvH/pub?output=csv";
+
+    const fetchData = () => {
+      fetch(csvUrl)
+        .then((res) => res.text())
+        .then((csvText) => {
+          Papa.parse(csvText, {
+            header: true,
+            complete: (result) => {
+              const parsedData: DataPoint[] = result.data
+                .filter((row: any) => row["Stat"] && row["Publisher"] && !isNaN(new Date(row["Date"]).getTime()))
+                .map((row: any) => ({
+                  summary: row["Stat"].trim(),
+                  source: row["Publisher"].trim(),
+                  sector: row["Tag 1"]?.trim() || "N/A",
+                  topic:
+                    row["Tag 2"]?.trim() ||
+                    row["Tag 3"]?.trim() ||
+                    row["Tag 4"]?.trim() ||
+                    row["Tag 5"]?.trim() ||
+                    "General",
+                  date: row["Date"]?.trim() || "Unknown",
+                  link: row["Link"]?.trim() || "",
+                  createdAt: new Date(row["Date"]),
+                }));
+              setDataPoints(parsedData);
+            },
+          });
+        });
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 1000 * 60 * 60 * 5); // refresh every 5 hours
+    return () => clearInterval(interval);
+  }, []);
+
+  const updateQueryParams = (params: Record<string, string>) => {
+    const query = new URLSearchParams(searchParams.toString());
+    Object.entries(params).forEach(([key, value]) => {
+      query.set(key, value);
+    });
+    router.push("?" + query.toString());
+  };
+
+  const now = new Date();
+  const filteredData = dataPoints
+    .filter((d) => {
+      const daysOld = (now.getTime() - d.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+      const matchDate =
+        dateRange === "all" ||
+        (dateRange === "7days" && daysOld <= 7) ||
+        (dateRange === "30days" && daysOld <= 30) ||
+        (dateRange === "year" && d.createdAt.getFullYear() === now.getFullYear());
+
+      return matchDate &&
+        (selectedTopic === "All" || d.topic === selectedTopic) &&
+        (d.summary.toLowerCase().includes(search.toLowerCase()) ||
+          d.source.toLowerCase().includes(search.toLowerCase()) ||
+          d.topic.toLowerCase().includes(search.toLowerCase()) ||
+          d.sector.toLowerCase().includes(search.toLowerCase()));
+    });
+
+  const paginatedData = filteredData.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const isNew = (createdAt: Date) => {
+    const now = new Date();
+    const diffDays = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+    return diffDays <= 30;
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main className="p-4 max-w-5xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6">Cybersecurity Trend Dashboard</h1>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <div className="mb-4 flex flex-col gap-6">
+        <input
+          type="text"
+          placeholder="Search stats, sources, sectors or topics"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setCurrentPage(1);
+            updateQueryParams({ search: e.target.value, page: "1" });
+          }}
+          className="w-full sm:w-1/2 border px-3 py-2 rounded"
+        />
+
+        <select
+          value={selectedTopic}
+          onChange={(e) => {
+            setSelectedTopic(e.target.value);
+            setCurrentPage(1);
+            updateQueryParams({ topic: e.target.value, page: "1" });
+          }}
+          className="border px-3 py-2 rounded w-full sm:w-auto"
+        >
+          {topics.map((topic, i) => (
+            <option key={i} value={topic}>
+              {topic}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: "All time", value: "all" },
+            { label: "Last 7 days", value: "7days" },
+            { label: "Last 30 days", value: "30days" },
+            { label: "This year", value: "year" },
+          ].map(({ label, value }) => (
+            <button
+              key={value}
+              onClick={() => {
+                setDateRange(value as "all" | "7days" | "30days" | "year");
+                setCurrentPage(1);
+                updateQueryParams({ range: value, page: "1" });
+              }}
+              className={`px-3 py-1 rounded border ${
+                dateRange === value ? "bg-blue-600 text-white" : "bg-white text-black"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+      </div>
+
+      <button
+        disabled={selectedIds.size === 0}
+        onClick={() => {
+          const selectedData = Array.from(selectedIds)
+            .map((i) => dataPoints[i])
+            .filter(Boolean);
+          const csv = Papa.unparse(selectedData);
+          const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.setAttribute("href", url);
+          link.setAttribute("download", "selected_stats.csv");
+          link.click();
+        }}
+        className="mb-4 px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+      >
+        Export Selected
+      </button>
+
+      <table className="w-full border text-sm">
+        <thead>
+          <tr className="bg-gray-100 text-left text-black">
+            <th className="border p-2 text-black">
+              <input
+                type="checkbox"
+                checked={
+                  paginatedData.length > 0 &&
+                  paginatedData.every((_, i) =>
+                    selectedIds.has(i + (currentPage - 1) * itemsPerPage)
+                  )
+                }
+                onChange={(e) => {
+                  const updated = new Set(selectedIds);
+                  paginatedData.forEach((_, i) => {
+                    const index = i + (currentPage - 1) * itemsPerPage;
+                    if (e.target.checked) {
+                      updated.add(index);
+                    } else {
+                      updated.delete(index);
+                    }
+                  });
+                  setSelectedIds(updated);
+                }}
+              />
+            </th>
+            <th className="border p-2 text-black">Source</th>
+            <th className="border p-2 text-black">Summary</th>
+            <th className="border p-2 text-black">Sector</th>
+            <th className="border p-2 text-black">Topic</th>
+          </tr>
+        </thead>
+        <tbody>
+          {paginatedData.map((d, i) => (
+            <tr key={i}>
+              <td className="border p-2">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(i + (currentPage - 1) * itemsPerPage)}
+                  onChange={() => {
+                    const index = i + (currentPage - 1) * itemsPerPage;
+                    const updated = new Set(selectedIds);
+                    if (updated.has(index)) {
+                      updated.delete(index);
+                    } else {
+                      updated.add(index);
+                    }
+                    setSelectedIds(updated);
+                  }}
+                />
+              </td>
+              <td className="border p-2">{d.source}</td>
+              <td className="border p-2">
+                <button
+                  onClick={() => {
+                    setSelectedStat(d);
+                    setShowModal(true);
+                  }}
+                  className="text-blue-600 underline hover:font-bold cursor-pointer transition-all"
+                >
+                  <>
+                    {d.summary}
+                    {isNew(d.createdAt) && (
+                      <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded">
+                        NEW
+                      </span>
+                    )}
+                  </>
+                </button>
+              </td>
+              <td className="border p-2">{d.sector}</td>
+              <td className="border p-2">{d.topic}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className="flex justify-center items-center gap-4 mt-4">
+        <button
+          onClick={() => {
+            const newPage = Math.max(currentPage - 1, 1);
+            setCurrentPage(newPage);
+            updateQueryParams({ page: newPage.toString() });
+          }}
+          disabled={currentPage === 1}
+          className="px-4 py-2 bg-gray-200 text-black rounded disabled:opacity-50"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          Prev
+        </button>
+        <span>Page {currentPage}</span>
+        <button
+          onClick={() => {
+            const newPage =
+              currentPage * itemsPerPage < filteredData.length ? currentPage + 1 : currentPage;
+            setCurrentPage(newPage);
+            updateQueryParams({ page: newPage.toString() });
+          }}
+          disabled={currentPage * itemsPerPage >= filteredData.length}
+          className="px-4 py-2 bg-gray-200 text-black rounded disabled:opacity-50"
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+          Next
+        </button>
+      </div>
+
+      <p className="text-sm text-gray-500 mt-2">
+        Last updated: {new Date().toLocaleString()}
+      </p>
+
+      {showModal && selectedStat && (
+        <>
+          <div
+            className="fixed inset-0 bg-neutral-400 bg-opacity-20 z-40"
+            onClick={() => setShowModal(false)}
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <div className="fixed z-50 bg-zinc-300 text-black p-4 shadow-lg rounded max-w-md w-fit mx-auto left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <h2 className="text-xl font-bold mb-4">Stat Detail</h2>
+            <p className="mb-2">
+              <strong>Stat:</strong> {selectedStat.summary}
+            </p>
+            <p className="mb-2">
+              <strong>Source:</strong> {selectedStat.source}
+            </p>
+            <p className="mb-2">
+              <strong>Sector:</strong> {selectedStat.sector}
+            </p>
+            <p className="mb-2">
+              <strong>Topic:</strong> {selectedStat.topic}
+            </p>
+            {selectedStat.link && (
+              <p className="mb-4">
+                <strong>Link:</strong>{" "}
+                <a
+                  href={selectedStat.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline"
+                >
+                  View Source
+                </a>
+              </p>
+            )}
+            <button
+              onClick={() => setShowModal(false)}
+              className="mt-2 bg-slate-800 text-white px-4 py-2 rounded"
+            >
+              Close
+            </button>
+          </div>
+        </>
+      )}
+    </main>
   );
 }
