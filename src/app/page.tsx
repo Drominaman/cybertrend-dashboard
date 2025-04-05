@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import Papa from "papaparse";
 
 type DataPoint = {
@@ -15,22 +14,14 @@ type DataPoint = {
 };
 
 export default function Page() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-
-  const [selectedTopic, setSelectedTopic] = useState(searchParams.get("topic") || "All");
-  const [search, setSearch] = useState(searchParams.get("search") || "");
-  const [dateRange, setDateRange] = useState<"all" | "7days" | "30days" | "year">(
-    (searchParams.get("range") as any) || "all"
-  );
-  const [currentPage, setCurrentPage] = useState(
-    parseInt(searchParams.get("page") || "1", 10)
-  );
-  const itemsPerPage = 10;
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
+  const [selectedTopic, setSelectedTopic] = useState("All");
+  const [search, setSearch] = useState("");
   const [selectedStat, setSelectedStat] = useState<DataPoint | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const topics = ["All", ...Array.from(new Set(dataPoints.map((d) => d.topic)))];
 
@@ -46,7 +37,7 @@ export default function Page() {
             header: true,
             complete: (result) => {
               const parsedData: DataPoint[] = result.data
-                .filter((row: any) => row["Stat"] && row["Publisher"] && !isNaN(new Date(row["Date"]).getTime()))
+                .filter((row: any) => row["Stat"] && row["Publisher"])
                 .map((row: any) => ({
                   summary: row["Stat"].trim(),
                   source: row["Publisher"].trim(),
@@ -72,31 +63,15 @@ export default function Page() {
     return () => clearInterval(interval);
   }, []);
 
-  const updateQueryParams = (params: Record<string, string>) => {
-    const query = new URLSearchParams(searchParams.toString());
-    Object.entries(params).forEach(([key, value]) => {
-      query.set(key, value);
-    });
-    router.push("?" + query.toString());
-  };
-
-  const now = new Date();
   const filteredData = dataPoints
-    .filter((d) => {
-      const daysOld = (now.getTime() - d.createdAt.getTime()) / (1000 * 60 * 60 * 24);
-      const matchDate =
-        dateRange === "all" ||
-        (dateRange === "7days" && daysOld <= 7) ||
-        (dateRange === "30days" && daysOld <= 30) ||
-        (dateRange === "year" && d.createdAt.getFullYear() === now.getFullYear());
-
-      return matchDate &&
+    .filter(
+      (d) =>
         (selectedTopic === "All" || d.topic === selectedTopic) &&
         (d.summary.toLowerCase().includes(search.toLowerCase()) ||
           d.source.toLowerCase().includes(search.toLowerCase()) ||
           d.topic.toLowerCase().includes(search.toLowerCase()) ||
-          d.sector.toLowerCase().includes(search.toLowerCase()));
-    });
+          d.sector.toLowerCase().includes(search.toLowerCase()))
+    );
 
   const paginatedData = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
@@ -121,7 +96,6 @@ export default function Page() {
           onChange={(e) => {
             setSearch(e.target.value);
             setCurrentPage(1);
-            updateQueryParams({ search: e.target.value, page: "1" });
           }}
           className="w-full sm:w-1/2 border px-3 py-2 rounded"
         />
@@ -131,7 +105,6 @@ export default function Page() {
           onChange={(e) => {
             setSelectedTopic(e.target.value);
             setCurrentPage(1);
-            updateQueryParams({ topic: e.target.value, page: "1" });
           }}
           className="border px-3 py-2 rounded w-full sm:w-auto"
         >
@@ -141,29 +114,6 @@ export default function Page() {
             </option>
           ))}
         </select>
-
-        <div className="flex flex-wrap gap-2">
-          {[
-            { label: "All time", value: "all" },
-            { label: "Last 7 days", value: "7days" },
-            { label: "Last 30 days", value: "30days" },
-            { label: "This year", value: "year" },
-          ].map(({ label, value }) => (
-            <button
-              key={value}
-              onClick={() => {
-                setDateRange(value as "all" | "7days" | "30days" | "year");
-                setCurrentPage(1);
-                updateQueryParams({ range: value, page: "1" });
-              }}
-              className={`px-3 py-1 rounded border ${
-                dateRange === value ? "bg-blue-600 text-white" : "bg-white text-black"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
       </div>
 
       <button
@@ -264,11 +214,7 @@ export default function Page() {
 
       <div className="flex justify-center items-center gap-4 mt-4">
         <button
-          onClick={() => {
-            const newPage = Math.max(currentPage - 1, 1);
-            setCurrentPage(newPage);
-            updateQueryParams({ page: newPage.toString() });
-          }}
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
           disabled={currentPage === 1}
           className="px-4 py-2 bg-gray-200 text-black rounded disabled:opacity-50"
         >
@@ -276,12 +222,11 @@ export default function Page() {
         </button>
         <span>Page {currentPage}</span>
         <button
-          onClick={() => {
-            const newPage =
-              currentPage * itemsPerPage < filteredData.length ? currentPage + 1 : currentPage;
-            setCurrentPage(newPage);
-            updateQueryParams({ page: newPage.toString() });
-          }}
+          onClick={() =>
+            setCurrentPage((prev) =>
+              prev * itemsPerPage < filteredData.length ? prev + 1 : prev
+            )
+          }
           disabled={currentPage * itemsPerPage >= filteredData.length}
           className="px-4 py-2 bg-gray-200 text-black rounded disabled:opacity-50"
         >
