@@ -241,7 +241,7 @@ export default function Page() {
       {showModal && selectedStat && (
         <>
           <div
-            className="fixed inset-0 bg-neutral-400 bg-opacity-20 z-40"
+            className="fixed inset-0 bg-transparent z-40"
             onClick={() => setShowModal(false)}
           />
           <div className="fixed z-50 bg-zinc-300 text-black p-4 shadow-lg rounded max-w-md w-fit mx-auto left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
