@@ -2,6 +2,17 @@
 
 import { useState, useEffect } from "react";
 import Papa from "papaparse";
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 type DataPoint = {
   summary: string;
@@ -22,8 +33,14 @@ export default function Page() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
 
   const topics = ["All", ...Array.from(new Set(dataPoints.map((d) => d.topic)))];
+
+  const topicCounts = dataPoints.reduce((acc, d) => {
+    acc[d.topic] = (acc[d.topic] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   useEffect(() => {
     const csvUrl =
@@ -63,15 +80,15 @@ export default function Page() {
     return () => clearInterval(interval);
   }, []);
 
-  const filteredData = dataPoints
-    .filter(
-      (d) =>
-        (selectedTopic === "All" || d.topic === selectedTopic) &&
-        (d.summary.toLowerCase().includes(search.toLowerCase()) ||
-          d.source.toLowerCase().includes(search.toLowerCase()) ||
-          d.topic.toLowerCase().includes(search.toLowerCase()) ||
-          d.sector.toLowerCase().includes(search.toLowerCase()))
-    );
+  const filteredData = dataPoints.filter(
+    (d) =>
+      (!selectedSource || d.source === selectedSource) &&
+      (selectedTopic === "All" || d.topic === selectedTopic) &&
+      (d.summary.toLowerCase().includes(search.toLowerCase()) ||
+        d.source.toLowerCase().includes(search.toLowerCase()) ||
+        d.topic.toLowerCase().includes(search.toLowerCase()) ||
+        d.sector.toLowerCase().includes(search.toLowerCase()))
+  );
 
   const paginatedData = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
@@ -81,11 +98,19 @@ export default function Page() {
   const isNew = (createdAt: Date) => {
     const now = new Date();
     const diffDays = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
-    return diffDays <= 30;
+    return diffDays <= 90;
   };
 
+  if (!dataPoints.length) {
+    return (
+      <main className="p-4 max-w-5xl mx-auto text-center text-gray-500">
+        Loading trends...
+      </main>
+    );
+  }
+
   return (
-    <main className="p-4 max-w-5xl mx-auto">
+    <main className="p-4 max-w-5xl mx-auto bg-white text-black">
       <h1 className="text-2xl font-bold mb-6">Cybersecurity Trend Dashboard</h1>
 
       <div className="mb-4 flex flex-col gap-6">
@@ -130,15 +155,28 @@ export default function Page() {
           link.setAttribute("download", "selected_stats.csv");
           link.click();
         }}
-        className="mb-4 px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+        className="mb-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50 transition-colors"
       >
         Export Selected
       </button>
 
-      <table className="w-full border text-sm">
-        <thead>
-          <tr className="bg-gray-100 text-left text-black">
-            <th className="border p-2 text-black">
+      {selectedSource && (
+        <button
+          onClick={() => setSelectedSource(null)}
+          className="mb-4 ml-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded transition-colors"
+        >
+          Clear Source Filter: {selectedSource}
+        </button>
+      )}
+
+      <p className="mb-2 text-sm text-gray-700">
+        Showing {filteredData.length} statistic{filteredData.length !== 1 ? "s" : ""}
+      </p>
+
+      <table className="w-full border border-black text-sm">
+        <thead className="sticky top-0 bg-gray-100 z-10 text-left text-xs uppercase text-gray-600">
+          <tr>
+            <th className="border border-black p-2 text-black">
               <input
                 type="checkbox"
                 checked={
@@ -161,16 +199,16 @@ export default function Page() {
                 }}
               />
             </th>
-            <th className="border p-2 text-black">Source</th>
-            <th className="border p-2 text-black">Summary</th>
-            <th className="border p-2 text-black">Sector</th>
-            <th className="border p-2 text-black">Topic</th>
+            <th className="border border-black p-2 text-black">Source</th>
+            <th className="border border-black p-2 text-black">Summary</th>
+            <th className="border border-black p-2 text-black">Sector</th>
+            <th className="border border-black p-2 text-black">Topic</th>
           </tr>
         </thead>
         <tbody>
           {paginatedData.map((d, i) => (
-            <tr key={i}>
-              <td className="border p-2">
+            <tr key={i} className="hover:bg-blue-50 transition-colors cursor-pointer">
+              <td className="border border-black p-2">
                 <input
                   type="checkbox"
                   checked={selectedIds.has(i + (currentPage - 1) * itemsPerPage)}
@@ -186,27 +224,30 @@ export default function Page() {
                   }}
                 />
               </td>
-              <td className="border p-2">{d.source}</td>
-              <td className="border p-2">
+              <td
+                className="border border-black p-2 text-blue-600 underline hover:font-bold cursor-pointer transition-all"
+                onClick={() => setSelectedSource(d.source)}
+              >
+                {d.source}
+              </td>
+              <td className="border border-black p-2">
                 <button
                   onClick={() => {
                     setSelectedStat(d);
                     setShowModal(true);
                   }}
-                  className="text-blue-600 underline hover:font-bold cursor-pointer transition-all"
+                  className="text-sm text-blue-600 underline hover:font-bold cursor-pointer transition-all"
                 >
-                  <>
-                    {d.summary}
-                    {isNew(d.createdAt) && (
-                      <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded">
-                        NEW
-                      </span>
-                    )}
-                  </>
+                  {d.summary}
+                  {isNew(d.createdAt) && (
+                    <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium uppercase">
+                      New
+                    </span>
+                  )}
                 </button>
               </td>
-              <td className="border p-2">{d.sector}</td>
-              <td className="border p-2">{d.topic}</td>
+              <td className="border border-black p-2">{d.sector}</td>
+              <td className="border border-black p-2">{d.topic}</td>
             </tr>
           ))}
         </tbody>
@@ -216,11 +257,11 @@ export default function Page() {
         <button
           onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
           disabled={currentPage === 1}
-          className="px-4 py-2 bg-gray-200 text-black rounded disabled:opacity-50"
+          className="px-4 py-2 bg-blue-100 text-blue-800 hover:bg-blue-200 rounded disabled:opacity-50 transition-colors"
         >
           Prev
         </button>
-        <span>Page {currentPage}</span>
+        <span>Page {currentPage} of {Math.ceil(filteredData.length / itemsPerPage)}</span>
         <button
           onClick={() =>
             setCurrentPage((prev) =>
@@ -228,15 +269,11 @@ export default function Page() {
             )
           }
           disabled={currentPage * itemsPerPage >= filteredData.length}
-          className="px-4 py-2 bg-gray-200 text-black rounded disabled:opacity-50"
+          className="px-4 py-2 bg-blue-100 text-blue-800 hover:bg-blue-200 rounded disabled:opacity-50 transition-colors"
         >
           Next
         </button>
       </div>
-
-      <p className="text-sm text-gray-500 mt-2">
-        Last updated: {new Date().toLocaleString()}
-      </p>
 
       {showModal && selectedStat && (
         <>
@@ -244,7 +281,7 @@ export default function Page() {
             className="fixed inset-0 bg-transparent z-40"
             onClick={() => setShowModal(false)}
           />
-          <div className="fixed z-50 bg-zinc-300 text-black p-4 shadow-lg rounded max-w-md w-fit mx-auto left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          <div className="fixed z-50 bg-white text-black p-4 shadow-lg rounded max-w-md w-fit mx-auto left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
             <h2 className="text-xl font-bold mb-4">Stat Detail</h2>
             <p className="mb-2">
               <strong>Stat:</strong> {selectedStat.summary}
@@ -273,7 +310,7 @@ export default function Page() {
             )}
             <button
               onClick={() => setShowModal(false)}
-              className="mt-2 bg-slate-800 text-white px-4 py-2 rounded"
+              className="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
             >
               Close
             </button>
