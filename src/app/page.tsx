@@ -47,7 +47,6 @@ export default function Page() {
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [sortBy, setSortBy] = useState<"date" | "source" | "topic">("date");
 
   const topics = ["All", ...Array.from(new Set(dataPoints.map((d) => d.topic)))];
@@ -135,8 +134,8 @@ export default function Page() {
   const sortedData = [...filteredData].sort((a, b) => {
     const valA = sortBy === "date" ? a.createdAt : a[sortBy].toLowerCase();
     const valB = sortBy === "date" ? b.createdAt : b[sortBy].toLowerCase();
-    if (valA < valB) return sortOrder === "asc" ? -1 : 1;
-    if (valA > valB) return sortOrder === "asc" ? 1 : -1;
+    if (valA < valB) return 1;
+    if (valA > valB) return -1;
     return 0;
   });
 
@@ -145,11 +144,6 @@ export default function Page() {
     currentPage * itemsPerPage
   );
 
-  const isNew = (createdAt: Date) => {
-    const now = new Date();
-    const diffDays = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
-    return diffDays <= 90;
-  };
 
   if (!dataPoints.length) {
     return (
@@ -219,17 +213,6 @@ export default function Page() {
           <option value="source">Sort by Source</option>
           <option value="topic">Sort by Topic</option>
         </select>
-        <select
-          className="border px-3 py-2 rounded text-sm"
-          value={sortOrder}
-          onChange={(e) => {
-            setSortOrder(e.target.value as "asc" | "desc");
-            setCurrentPage(1);
-          }}
-        >
-          <option value="desc">Descending</option>
-          <option value="asc">Ascending</option>
-        </select>
         <input
           type="text"
           placeholder="Search for data"
@@ -242,7 +225,7 @@ export default function Page() {
               topic: selectedTopic,
               date: selectedDate,
               search: e.target.value,
-              sort: sortOrder,
+              // remove sortOrder from the filters
             }));
           }}
           className="border px-3 py-2 rounded flex-1 min-w-[200px]"
@@ -367,11 +350,6 @@ export default function Page() {
                   className="text-sm text-blue-600 underline hover:font-bold cursor-pointer transition-all"
                 >
                   {d.summary}
-                  {isNew(d.createdAt) && (
-                    <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium uppercase">
-                      New
-                    </span>
-                  )}
                 </button>
               </td>
             </tr>
@@ -428,15 +406,6 @@ export default function Page() {
                 </a>
               </p>
             )}
-            <button
-              onClick={() => {
-                const link = `${window.location.origin}/#stat=${selectedStat.id}`;
-                navigator.clipboard.writeText(link);
-              }}
-              className="mb-2 bg-gray-100 hover:bg-gray-200 text-sm text-gray-800 px-3 py-1.5 rounded transition-colors"
-            >
-              Copy Link
-            </button>
             <button
               onClick={() => {
                 setShowModal(false);
