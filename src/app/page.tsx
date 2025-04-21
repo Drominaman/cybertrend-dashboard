@@ -31,9 +31,20 @@ type DataPoint = {
   topic: string;
   date: string;
   link: string;
-  createdAt: Date;
   keywords: string[];
 };
+
+// Helper to parse DD/MM/YYYY dates (European format)
+function parseDateEUFormat(dateStr: string): Date | null {
+  const match = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (match) {
+    const [_, day, month, year] = match;
+    const iso = `${year}-${month}-${day}`;
+    const date = new Date(iso);
+    return isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
 
 export default function Page() {
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
@@ -70,19 +81,6 @@ export default function Page() {
               const parsedData: DataPoint[] = result.data
                 .filter((row: any) => row["Stat"] && row["Publisher"]?.trim())
                 .map((row: any, index: number) => {
-                  const rawDate = (row["Date"] || "").toString().trim();
-                  let parsedDate = new Date("Invalid");
-                  
-                  if (rawDate) {
-                    // Try parsing formats like "Apr 2025", "April 2025", "2025-04-01", etc.
-                    const tryParsed = new Date(rawDate);
-                    if (!isNaN(tryParsed.getTime())) {
-                      parsedDate = tryParsed;
-                    } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(rawDate)) {
-                      const [day, month, year] = rawDate.split("/");
-                      parsedDate = new Date(`${year}-${month}-${day}`);
-                    }
-                  }
                   return {
                     id: index.toString(),
                     summary: row["Stat"].trim(),
@@ -96,7 +94,6 @@ export default function Page() {
                       "General",
                     date: row["Date"]?.trim() || "Unknown",
                     link: row["Link"]?.trim() || "",
-                    createdAt: parsedDate,
                     keywords: extractKeywords(row["Stat"] || ""),
                   };
                 });
@@ -132,8 +129,14 @@ export default function Page() {
   );
 
   const sortedData = [...filteredData].sort((a, b) => {
-    const valA = sortBy === "date" ? a.createdAt : a[sortBy].toLowerCase();
-    const valB = sortBy === "date" ? b.createdAt : b[sortBy].toLowerCase();
+    if (sortBy === "date") {
+      const dateA = parseDateEUFormat(a.date) || new Date(a.date);
+      const dateB = parseDateEUFormat(b.date) || new Date(b.date);
+      return dateB.getTime() - dateA.getTime(); // most recent first
+    }
+
+    const valA = a[sortBy]?.toLowerCase?.() || "";
+    const valB = b[sortBy]?.toLowerCase?.() || "";
     if (valA < valB) return 1;
     if (valA > valB) return -1;
     return 0;
@@ -186,21 +189,7 @@ export default function Page() {
             </option>
           ))}
         </select>
-        <select
-          className="border px-3 py-2 rounded text-sm"
-          value={selectedDate || ""}
-          onChange={(e) => {
-            setSelectedDate(e.target.value || null);
-            setCurrentPage(1);
-          }}
-        >
-          <option value="">All Dates</option>
-          {[...new Set(dataPoints.map((d) => d.date))].sort().map((date) => (
-            <option key={date} value={date}>
-              {date}
-            </option>
-          ))}
-        </select>
+        {/* Date filter dropdown removed */}
         <select
           className="border px-3 py-2 rounded text-sm"
           value={sortBy}
@@ -313,6 +302,7 @@ export default function Page() {
             </th>
             <th className="border border-black p-2 text-black">Source</th>
             <th className="border border-black p-2 text-black">Summary</th>
+            <th className="border border-black p-2 text-black">Published</th>
           </tr>
         </thead>
         <tbody>
@@ -351,6 +341,14 @@ export default function Page() {
                 >
                   {d.summary}
                 </button>
+              </td>
+              <td className="border border-black p-2">
+                {(() => {
+                  const parsed = parseDateEUFormat(d.date) || new Date(d.date);
+                  return !isNaN(parsed.getTime())
+                    ? parsed.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+                    : "Unknown";
+                })()}
               </td>
             </tr>
           ))}
@@ -392,6 +390,15 @@ export default function Page() {
             </p>
             <p className="mb-2">
               <strong>Source:</strong> {selectedStat.source}
+            </p>
+            <p className="mb-2">
+              <strong>Published:</strong>{" "}
+              {(() => {
+                const parsed = parseDateEUFormat(selectedStat.date) || new Date(selectedStat.date);
+                return !isNaN(parsed.getTime())
+                  ? parsed.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+                  : "Unknown";
+              })()}
             </p>
             {selectedStat.link && (
               <p className="mb-4">
