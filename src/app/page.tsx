@@ -14,7 +14,17 @@ import {
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
+const extractKeywords = (text: string) => {
+  const stopWords = ["the", "and", "for", "with", "that", "from", "this", "into", "when", "are"];
+  return text
+    .toLowerCase()
+    .split(/\W+/)
+    .filter((word) => word.length > 3 && !stopWords.includes(word))
+    .slice(0, 5);
+};
+
 type DataPoint = {
+  id: string;
   summary: string;
   source: string;
   sector: string;
@@ -22,6 +32,7 @@ type DataPoint = {
   date: string;
   link: string;
   createdAt: Date;
+  keywords: string[];
 };
 
 export default function Page() {
@@ -35,6 +46,9 @@ export default function Page() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedSector, setSelectedSector] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortBy, setSortBy] = useState<"date" | "source" | "topic">("date");
 
   const topics = ["All", ...Array.from(new Set(dataPoints.map((d) => d.topic)))];
 
@@ -55,8 +69,8 @@ export default function Page() {
             header: true,
             complete: (result) => {
               const parsedData: DataPoint[] = result.data
-                .filter((row: any) => row["Stat"] && row["Publisher"])
-                .map((row: any) => {
+                .filter((row: any) => row["Stat"])
+                .map((row: any, index: number) => {
                   let parsedDate = new Date();
                   const rawDate = row["Date"]?.trim();
                   if (rawDate && /^\/[A-Za-z]+\/\d{4}$/.test(rawDate)) {
@@ -66,6 +80,7 @@ export default function Page() {
                     parsedDate = new Date(`${monthName} 1, ${year}`);
                   }
                   return {
+                    id: index.toString(),
                     summary: row["Stat"].trim(),
                     source: row["Publisher"].trim(),
                     sector: row["Tag 1"]?.trim() || "N/A",
@@ -78,9 +93,19 @@ export default function Page() {
                     date: row["Date"]?.trim() || "Unknown",
                     link: row["Link"]?.trim() || "",
                     createdAt: parsedDate,
+                    keywords: extractKeywords(row["Stat"] || ""),
                   };
                 });
               setDataPoints(parsedData);
+              const hash = window.location.hash;
+              if (hash.startsWith("#stat=")) {
+                const id = hash.split("=")[1];
+                const match = parsedData.find((d) => d.id === id);
+                if (match) {
+                  setSelectedStat(match);
+                  setShowModal(true);
+                }
+              }
             },
           });
         });
@@ -96,12 +121,21 @@ export default function Page() {
       (!selectedSource || d.source === selectedSource) &&
       (selectedTopic === "All" || d.topic === selectedTopic) &&
       (!selectedDate || d.date === selectedDate) &&
+      (!selectedSector || d.sector === selectedSector) &&
       (d.summary.toLowerCase().includes(search.toLowerCase()) ||
         d.source.toLowerCase().includes(search.toLowerCase()) ||
         d.topic.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const paginatedData = filteredData.slice(
+  const sortedData = [...filteredData].sort((a, b) => {
+    const valA = sortBy === "date" ? a.createdAt : a[sortBy].toLowerCase();
+    const valB = sortBy === "date" ? b.createdAt : b[sortBy].toLowerCase();
+    if (valA < valB) return sortOrder === "asc" ? -1 : 1;
+    if (valA > valB) return sortOrder === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const paginatedData = sortedData.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -123,6 +157,21 @@ export default function Page() {
   return (
     <main className="p-4 max-w-5xl mx-auto bg-white text-black">
       <div className="mb-4 flex flex-wrap items-center gap-2">
+        <select
+          className="border px-3 py-2 rounded text-sm"
+          value={selectedSector || ""}
+          onChange={(e) => {
+            setSelectedSector(e.target.value || null);
+            setCurrentPage(1);
+          }}
+        >
+          <option value="">All Topics</option>
+          {[...new Set(dataPoints.map((d) => d.sector))].map((sector) => (
+            <option key={sector} value={sector}>
+              {sector}
+            </option>
+          ))}
+        </select>
         <select
           className="border px-3 py-2 rounded text-sm"
           value={selectedSource || ""}
@@ -153,13 +202,43 @@ export default function Page() {
             </option>
           ))}
         </select>
+        <select
+          className="border px-3 py-2 rounded text-sm"
+          value={sortBy}
+          onChange={(e) => {
+            setSortBy(e.target.value as "date" | "source" | "topic");
+            setCurrentPage(1);
+          }}
+        >
+          <option value="date">Sort by Date</option>
+          <option value="source">Sort by Source</option>
+          <option value="topic">Sort by Topic</option>
+        </select>
+        <select
+          className="border px-3 py-2 rounded text-sm"
+          value={sortOrder}
+          onChange={(e) => {
+            setSortOrder(e.target.value as "asc" | "desc");
+            setCurrentPage(1);
+          }}
+        >
+          <option value="desc">Descending</option>
+          <option value="asc">Ascending</option>
+        </select>
         <input
           type="text"
-          placeholder="Search for topics"
+          placeholder="Search for data"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
             setCurrentPage(1);
+            localStorage.setItem("trendFilters", JSON.stringify({
+              source: selectedSource,
+              topic: selectedTopic,
+              date: selectedDate,
+              search: e.target.value,
+              sort: sortOrder,
+            }));
           }}
           className="border px-3 py-2 rounded flex-1 min-w-[200px]"
         />
@@ -205,6 +284,15 @@ export default function Page() {
         </button>
       )}
 
+      {selectedSector && (
+        <button
+          onClick={() => setSelectedSector(null)}
+          className="mb-4 ml-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded transition-colors"
+        >
+          Clear Industry Filter: {selectedSector}
+        </button>
+      )}
+
       <p className="mb-2 text-sm text-gray-700">
         Showing {filteredData.length} statistic{filteredData.length !== 1 ? "s" : ""}
       </p>
@@ -238,6 +326,7 @@ export default function Page() {
             <th className="border border-black p-2 text-black">Source</th>
             <th className="border border-black p-2 text-black">Summary</th>
             <th className="border border-black p-2 text-black">Topic</th>
+            <th className="border border-black p-2 text-black">Published</th>
           </tr>
         </thead>
         <tbody>
@@ -270,6 +359,7 @@ export default function Page() {
                   onClick={() => {
                     setSelectedStat(d);
                     setShowModal(true);
+                    window.location.hash = `stat=${d.id}`;
                   }}
                   className="text-sm text-blue-600 underline hover:font-bold cursor-pointer transition-all"
                 >
@@ -282,6 +372,12 @@ export default function Page() {
                 </button>
               </td>
               <td className="border border-black p-2">{d.topic}</td>
+              <td className="border border-black p-2">
+                {new Date(d.createdAt).toLocaleDateString("en-US", {
+                  month: "long",
+                  year: "numeric",
+                })}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -347,7 +443,19 @@ export default function Page() {
               </p>
             )}
             <button
-              onClick={() => setShowModal(false)}
+              onClick={() => {
+                const link = `${window.location.origin}/#stat=${selectedStat.id}`;
+                navigator.clipboard.writeText(link);
+              }}
+              className="mb-2 bg-gray-100 hover:bg-gray-200 text-sm text-gray-800 px-3 py-1.5 rounded transition-colors"
+            >
+              Copy Link
+            </button>
+            <button
+              onClick={() => {
+                setShowModal(false);
+                window.location.hash = "";
+              }}
               className="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
             >
               Close
