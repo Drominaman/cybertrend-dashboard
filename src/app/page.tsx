@@ -325,7 +325,6 @@ export default function Page() {
             </th>
             <th className="border border-black p-2 text-black">Source</th>
             <th className="border border-black p-2 text-black">Summary</th>
-            <th className="border border-black p-2 text-black">Topic</th>
             <th className="border border-black p-2 text-black">Published</th>
           </tr>
         </thead>
@@ -371,7 +370,6 @@ export default function Page() {
                   )}
                 </button>
               </td>
-              <td className="border border-black p-2">{d.topic}</td>
               <td className="border border-black p-2">
                 {new Date(d.createdAt).toLocaleDateString("en-US", {
                   month: "long",
@@ -418,9 +416,6 @@ export default function Page() {
             </p>
             <p className="mb-2">
               <strong>Source:</strong> {selectedStat.source}
-            </p>
-            <p className="mb-2">
-              <strong>Topic:</strong> {selectedStat.topic}
             </p>
             <p className="mb-2">
               <strong>Published:</strong>{" "}
