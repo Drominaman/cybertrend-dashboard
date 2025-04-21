@@ -69,15 +69,24 @@ export default function Page() {
             header: true,
             complete: (result) => {
               const parsedData: DataPoint[] = result.data
-                .filter((row: any) => row["Stat"])
+                .filter((row: any) => row["Stat"] && row["Publisher"]?.trim())
                 .map((row: any, index: number) => {
-                  let parsedDate = new Date();
-                  const rawDate = row["Date"]?.trim();
-                  if (rawDate && /^\/[A-Za-z]+\/\d{4}$/.test(rawDate)) {
-                    const parts = rawDate.split("/");
-                    const monthName = parts[1];
-                    const year = parts[2];
-                    parsedDate = new Date(`${monthName} 1, ${year}`);
+                  const rawDate = (row["Date"] || "").toString().trim();
+                  let parsedDate = new Date("Invalid");
+                  if (rawDate) {
+                    // Try parsing formats like "Apr 2025" or "April 2025"
+                    const parsedMonthYear = new Date(rawDate);
+                    if (!isNaN(parsedMonthYear.getTime())) {
+                      parsedDate = parsedMonthYear;
+                    } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(rawDate)) {
+                      // Format: "DD/MM/YYYY"
+                      const [day, month, year] = rawDate.split("/");
+                      parsedDate = new Date(`${year}-${month}-${day}`);
+                    }
+                  }
+                  // fallback if still invalid
+                  if (isNaN(parsedDate.getTime())) {
+                    parsedDate = new Date();
                   }
                   return {
                     id: index.toString(),
@@ -371,10 +380,11 @@ export default function Page() {
                 </button>
               </td>
               <td className="border border-black p-2">
-                {new Date(d.createdAt).toLocaleDateString("en-US", {
-                  month: "long",
-                  year: "numeric",
-                })}
+                {isNaN(d.createdAt.getTime())
+                  ? "Unknown"
+                  : d.createdAt.getDate() === 1 && d.createdAt.getMonth() === 0
+                  ? d.createdAt.getFullYear()
+                  : d.createdAt.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
               </td>
             </tr>
           ))}
@@ -419,10 +429,11 @@ export default function Page() {
             </p>
             <p className="mb-2">
               <strong>Published:</strong>{" "}
-              {new Date(selectedStat.createdAt).toLocaleDateString("en-US", {
-                month: "long",
-                year: "numeric",
-              })}
+              {isNaN(selectedStat.createdAt.getTime())
+                ? "Unknown"
+                : selectedStat.createdAt.getDate() === 1 && selectedStat.createdAt.getMonth() === 0
+                ? selectedStat.createdAt.getFullYear()
+                : selectedStat.createdAt.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
             </p>
             {selectedStat.link && (
               <p className="mb-4">
