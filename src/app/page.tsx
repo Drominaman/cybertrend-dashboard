@@ -121,7 +121,11 @@ export default function Page() {
     (d) =>
       (!selectedSource || d.source === selectedSource) &&
       (selectedTopic === "All" || d.topic === selectedTopic) &&
-      (!selectedDate || d.date === selectedDate) &&
+      (!selectedDate || (() => {
+        const parsed = parseDateEUFormat(d.date) || new Date(d.date);
+        const normalized = !isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 7) : "";
+        return normalized === selectedDate;
+      })()) &&
       (!selectedSector || d.sector === selectedSector) &&
       (d.summary.toLowerCase().includes(search.toLowerCase()) ||
         d.source.toLowerCase().includes(search.toLowerCase()) ||
@@ -189,7 +193,33 @@ export default function Page() {
             </option>
           ))}
         </select>
-        {/* Date filter dropdown removed */}
+        <select
+          className="border px-3 py-2 rounded text-sm"
+          value={selectedDate || ""}
+          onChange={(e) => {
+            setSelectedDate(e.target.value || null);
+            setCurrentPage(1);
+          }}
+        >
+          <option value="">All Dates</option>
+          {[...new Set(dataPoints.map((d) => {
+            const parsed = parseDateEUFormat(d.date) || new Date(d.date);
+            return !isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 7) : null;
+          }).filter(Boolean))]
+            .sort()
+            .map((month) => {
+              const dateObj = new Date(`${month}-01`);
+              const display = dateObj.toLocaleDateString("en-US", {
+                month: "long",
+                year: "2-digit",
+              });
+              return (
+                <option key={month} value={month}>
+                  {display}
+                </option>
+              );
+            })}
+        </select>
         <select
           className="border px-3 py-2 rounded text-sm"
           value={sortBy}
@@ -344,10 +374,12 @@ export default function Page() {
               </td>
               <td className="border border-black p-2">
                 {(() => {
-                  const parsed = parseDateEUFormat(d.date) || new Date(d.date);
-                  return !isNaN(parsed.getTime())
-                    ? parsed.toLocaleDateString("en-US", { month: "long", year: "numeric" })
-                    : "Unknown";
+                  const parsed = parseDateEUFormat(d.date);
+                  if (parsed && !isNaN(parsed.getTime())) {
+                    return parsed.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+                  }
+                  const yearOnly = d.date.match(/(?:\D|^)(\d{4})(?:\D|$)/);
+                  return yearOnly ? yearOnly[1] : "Unknown";
                 })()}
               </td>
             </tr>
@@ -394,10 +426,12 @@ export default function Page() {
             <p className="mb-2">
               <strong>Published:</strong>{" "}
               {(() => {
-                const parsed = parseDateEUFormat(selectedStat.date) || new Date(selectedStat.date);
-                return !isNaN(parsed.getTime())
-                  ? parsed.toLocaleDateString("en-US", { month: "long", year: "numeric" })
-                  : "Unknown";
+                const parsed = parseDateEUFormat(selectedStat.date);
+                if (parsed && !isNaN(parsed.getTime())) {
+                  return parsed.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+                }
+                const yearOnly = selectedStat.date.match(/(?:\D|^)(\d{4})(?:\D|$)/);
+                return yearOnly ? yearOnly[1] : "Unknown";
               })()}
             </p>
             {selectedStat.link && (
