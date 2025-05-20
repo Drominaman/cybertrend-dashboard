@@ -58,7 +58,6 @@ export default function Page() {
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<"date" | "source" | "topic">("date");
 
   const topics = ["All", ...Array.from(new Set(dataPoints.map((d) => d.topic)))];
 
@@ -132,19 +131,7 @@ export default function Page() {
         d.topic.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const sortedData = [...filteredData].sort((a, b) => {
-    if (sortBy === "date") {
-      const dateA = parseDateEUFormat(a.date) || new Date(a.date);
-      const dateB = parseDateEUFormat(b.date) || new Date(b.date);
-      return dateB.getTime() - dateA.getTime(); // most recent first
-    }
-
-    const valA = a[sortBy]?.toLowerCase?.() || "";
-    const valB = b[sortBy]?.toLowerCase?.() || "";
-    if (valA < valB) return 1;
-    if (valA > valB) return -1;
-    return 0;
-  });
+  const sortedData = filteredData;
 
   const paginatedData = sortedData.slice(
     (currentPage - 1) * itemsPerPage,
@@ -219,18 +206,6 @@ export default function Page() {
                 </option>
               );
             })}
-        </select>
-        <select
-          className="border px-3 py-2 rounded text-sm"
-          value={sortBy}
-          onChange={(e) => {
-            setSortBy(e.target.value as "date" | "source" | "topic");
-            setCurrentPage(1);
-          }}
-        >
-          <option value="date">Sort by Date</option>
-          <option value="source">Sort by Source</option>
-          <option value="topic">Sort by Topic</option>
         </select>
         <input
           type="text"
