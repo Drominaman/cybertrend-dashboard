@@ -120,11 +120,6 @@ export default function Page() {
     (d) =>
       (!selectedSource || d.source === selectedSource) &&
       (selectedTopic === "All" || d.topic === selectedTopic) &&
-      (!selectedDate || (() => {
-        const parsed = parseDateEUFormat(d.date) || new Date(d.date);
-        const normalized = !isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 7) : "";
-        return normalized === selectedDate;
-      })()) &&
       (!selectedSector || d.sector === selectedSector) &&
       (d.summary.toLowerCase().includes(search.toLowerCase()) ||
         d.source.toLowerCase().includes(search.toLowerCase()) ||
