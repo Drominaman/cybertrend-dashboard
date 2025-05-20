@@ -56,7 +56,6 @@ export default function Page() {
   const itemsPerPage = 10;
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
 
   const topics = ["All", ...Array.from(new Set(dataPoints.map((d) => d.topic)))];
