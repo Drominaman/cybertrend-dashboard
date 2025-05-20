@@ -180,33 +180,6 @@ export default function Page() {
             </option>
           ))}
         </select>
-        <select
-          className="border px-3 py-2 rounded text-sm"
-          value={selectedDate || ""}
-          onChange={(e) => {
-            setSelectedDate(e.target.value || null);
-            setCurrentPage(1);
-          }}
-        >
-          <option value="">All Dates</option>
-          {[...new Set(dataPoints.map((d) => {
-            const parsed = parseDateEUFormat(d.date) || new Date(d.date);
-            return !isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 7) : null;
-          }).filter(Boolean))]
-            .sort()
-            .map((month) => {
-              const dateObj = new Date(`${month}-01`);
-              const display = dateObj.toLocaleDateString("en-US", {
-                month: "long",
-                year: "2-digit",
-              });
-              return (
-                <option key={month} value={month}>
-                  {display}
-                </option>
-              );
-            })}
-        </select>
         <input
           type="text"
           placeholder="Search for data"
@@ -257,14 +230,6 @@ export default function Page() {
         </button>
       )}
 
-      {selectedDate && (
-        <button
-          onClick={() => setSelectedDate(null)}
-          className="mb-4 ml-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded transition-colors"
-        >
-          Clear Date Filter: {selectedDate}
-        </button>
-      )}
 
       {selectedSector && (
         <button
