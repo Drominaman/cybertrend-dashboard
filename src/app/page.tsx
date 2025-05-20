@@ -11,6 +11,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import { Analytics } from "@vercel/analytics/react";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -398,6 +399,7 @@ export default function Page() {
           </div>
         </>
       )}
+      <Analytics />
     </main>
   );
 }
