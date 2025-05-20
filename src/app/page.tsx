@@ -160,7 +160,7 @@ export default function Page() {
         >
           <option value="">All Topics</option>
           {[...new Set(dataPoints.map((d) => d.sector))].map((sector) => (
-            <option key={sector} value={sector}>
+            <option key={sector as string} value={sector as string}>
               {sector}
             </option>
           ))}
