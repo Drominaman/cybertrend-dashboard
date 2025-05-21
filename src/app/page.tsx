@@ -58,6 +58,7 @@ export default function Page() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
+  const [selectedDateFilter, setSelectedDateFilter] = useState("");
 
   const topics = ["All", ...Array.from(new Set(dataPoints.map((d) => d.topic)))];
 
@@ -121,6 +122,13 @@ export default function Page() {
       (!selectedSource || d.source === selectedSource) &&
       (selectedTopic === "All" || d.topic === selectedTopic) &&
       (!selectedSector || d.sector === selectedSector) &&
+      (selectedDateFilter === "" ||
+        (() => {
+          const parsed = parseDateEUFormat(d.date);
+          const normalized =
+            !isNaN(parsed?.getTime?.() ?? NaN) ? parsed.toISOString().slice(0, 7) : "";
+          return normalized === selectedDateFilter;
+        })()) &&
       (d.summary.toLowerCase().includes(search.toLowerCase()) ||
         d.source.toLowerCase().includes(search.toLowerCase()) ||
         d.topic.toLowerCase().includes(search.toLowerCase()))
@@ -160,6 +168,25 @@ export default function Page() {
             </option>
           ))}
         </select>
+        {/* Date filter dropdown */}
+        <select
+          className="border px-3 py-2 rounded text-sm"
+          value={selectedDateFilter}
+          onChange={(e) => {
+            setSelectedDateFilter(e.target.value);
+            setCurrentPage(1);
+          }}
+        >
+          <option value="">All Dates</option>
+          {[...new Set(dataPoints.map((d) => {
+            const parsed = parseDateEUFormat(d.date);
+            return parsed && !isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 7) : null;
+          }).filter(Boolean))].sort().map((month) => (
+            <option key={month} value={month}>
+              {new Date(`${month}-01`).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+            </option>
+          ))}
+        </select>
         <select
           className="border px-3 py-2 rounded text-sm"
           value={selectedSource || ""}
@@ -185,7 +212,7 @@ export default function Page() {
             localStorage.setItem("trendFilters", JSON.stringify({
               source: selectedSource,
               topic: selectedTopic,
-              date: selectedDate,
+              date: selectedDateFilter,
               search: e.target.value,
               // remove sortOrder from the filters
             }));
@@ -232,6 +259,15 @@ export default function Page() {
           className="mb-4 ml-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded transition-colors"
         >
           Clear Industry Filter: {selectedSector}
+        </button>
+      )}
+
+      {selectedDateFilter && (
+        <button
+          onClick={() => setSelectedDateFilter("")}
+          className="mb-4 ml-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded transition-colors"
+        >
+          Clear Date Filter: {selectedDateFilter}
         </button>
       )}
 
@@ -384,6 +420,17 @@ export default function Page() {
             )}
             <button
               onClick={() => {
+                if (selectedStat?.summary && selectedStat?.link) {
+                  const htmlLink = `${selectedStat.summary} (${selectedStat.link})`;
+                  navigator.clipboard.writeText(htmlLink);
+                }
+              }}
+              className="mr-2 mt-2 bg-gray-200 hover:bg-gray-300 text-black px-4 py-2 rounded transition-colors"
+            >
+              Copy Stat
+            </button>
+            <button
+              onClick={() => {
                 setShowModal(false);
                 window.location.hash = "";
               }}
@@ -394,6 +441,8 @@ export default function Page() {
           </div>
         </>
       )}
+
+      {/* Date modal removed */}
       <Analytics />
     </main>
   );
