@@ -125,8 +125,10 @@ export default function Page() {
       (selectedDateFilter === "" ||
         (() => {
           const parsed = parseDateEUFormat(d.date);
-          if (!parsed || isNaN(parsed.getTime())) return false;
-          const normalized = parsed.toISOString().slice(0, 7);
+          let normalized = "";
+          if (parsed && !isNaN(parsed.getTime())) {
+            normalized = parsed.toISOString().slice(0, 7);
+          }
           return normalized === selectedDateFilter;
         })()) &&
       (d.summary.toLowerCase().includes(search.toLowerCase()) ||
