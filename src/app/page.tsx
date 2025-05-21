@@ -186,10 +186,15 @@ export default function Page() {
             if (parsed && !isNaN(parsed.getTime())) {
               normalized = parsed.toISOString().slice(0, 7);
             }
-            return normalized || null;
+            return normalized || "";
           }).filter(Boolean))].sort().map((month) => (
-            <option key={month} value={month}>
-              {new Date(`${month}-01`).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+            <option key={month || "unknown"} value={month || ""}>
+              {month
+                ? new Date(`${month}-01`).toLocaleDateString("en-US", {
+                    month: "long",
+                    year: "numeric",
+                  })
+                : "Unknown"}
             </option>
           ))}
         </select>
