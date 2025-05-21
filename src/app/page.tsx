@@ -125,8 +125,8 @@ export default function Page() {
       (selectedDateFilter === "" ||
         (() => {
           const parsed = parseDateEUFormat(d.date);
-          const normalized =
-            !isNaN(parsed?.getTime?.() ?? NaN) ? parsed.toISOString().slice(0, 7) : "";
+          if (!parsed || isNaN(parsed.getTime())) return false;
+          const normalized = parsed.toISOString().slice(0, 7);
           return normalized === selectedDateFilter;
         })()) &&
       (d.summary.toLowerCase().includes(search.toLowerCase()) ||
@@ -180,7 +180,11 @@ export default function Page() {
           <option value="">All Dates</option>
           {[...new Set(dataPoints.map((d) => {
             const parsed = parseDateEUFormat(d.date);
-            return parsed && !isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 7) : null;
+            let normalized = "";
+            if (parsed && !isNaN(parsed.getTime())) {
+              normalized = parsed.toISOString().slice(0, 7);
+            }
+            return normalized || null;
           }).filter(Boolean))].sort().map((month) => (
             <option key={month} value={month}>
               {new Date(`${month}-01`).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
