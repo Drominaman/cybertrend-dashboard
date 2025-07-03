@@ -2,6 +2,12 @@ import React, { useMemo } from 'react';
 import { TrendItem } from '../types';
 import { LinkIcon, BuildingOfficeIcon, CalendarDaysIcon } from './icons';
 
+/** Ensure link is an absolute URL with protocol */
+function ensureAbsoluteUrl(url: string): string {
+  if (!url) return '';
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
 interface ResultCardProps {
   item: TrendItem;
 }
@@ -73,15 +79,22 @@ const ResultCard: React.FC<ResultCardProps> = ({ item }) => {
       )}
       
       <div className="mt-auto pt-4 border-t border-slate-700/50">
-         <a
-          href={link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center text-blue-400 hover:text-blue-300 font-semibold transition-colors duration-200"
-        >
-          <LinkIcon className="h-5 w-5 mr-2" />
-          View Source
-        </a>
+        {ensureAbsoluteUrl(link) ? (
+          <>
+            <a
+              href={ensureAbsoluteUrl(link)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center text-blue-400 hover:text-blue-300 font-semibold transition-colors duration-200"
+            >
+              <LinkIcon className="h-5 w-5 mr-2" />
+              View Source
+            </a>
+            <p className="text-xs text-slate-400 mt-1 break-all">
+              {ensureAbsoluteUrl(link)}
+            </p>
+          </>
+        ) : null}
       </div>
     </article>
   );

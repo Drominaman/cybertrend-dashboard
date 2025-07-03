@@ -1,3 +1,21 @@
+/** Ensure the URL has a protocol; default to https if missing.
+ * Extracts the pure URL from markdown, HTML, or raw string.
+ */
+function normalizeUrl(raw: string): string {
+  let urlStr = raw.trim();
+  // If markdown link syntax [text](URL), extract URL
+  const mdMatch = urlStr.match(/\[.*?\]\((.*?)\)/);
+  if (mdMatch) urlStr = mdMatch[1].trim();
+  // If HTML anchor tag, extract href value
+  const hrefMatch = urlStr.match(/href=["']([^"']+)["']/i);
+  if (hrefMatch) urlStr = hrefMatch[1].trim();
+  // Extract first URL-like substring (including bare domains)
+  const urlMatch = urlStr.match(/(https?:\/\/[^\s)]+|(?:www\.)?[^\s/$.?#]+\.[^\s/$.?#]+)/i);
+  if (!urlMatch) return '';
+  urlStr = urlMatch[0];
+  // Ensure protocol is present
+  return /^https?:\/\//i.test(urlStr) ? urlStr : `https://${urlStr}`;
+}
 import Papa from 'papaparse';
 import { TrendItem, FilterOptions } from '../types';
 import { countries } from './locationData';
@@ -41,6 +59,8 @@ export const fetchDashboardData = async (): Promise<{ trends: TrendItem[]; filte
                 }
 
                 const headers = results.meta.fields;
+                // Dynamically detect the header used for link URLs
+                const linkKey = headers?.find(h => h === 'Link') || headers?.find(h => /link/i.test(h) || /url/i.test(h));
                 if (!headers || !REQUIRED_HEADERS.every(h => headers.includes(h))) {
                     return reject(new Error(`CSV is missing required headers. Found: ${headers?.join(', ')}. Required: ${REQUIRED_HEADERS.join(', ')}`));
                 }
@@ -78,10 +98,13 @@ export const fetchDashboardData = async (): Promise<{ trends: TrendItem[]; filte
                         const textToScan = [row['Resource Name'], row['Stat'], notes].join(' ');
                         const locations = findLocationsInText(textToScan);
 
+                        // Use detected link header or fall back
+                        const rawLink = linkKey ? String(row[linkKey] || '') : String(row['Link'] || '');
+
                         return {
                             id: `${index}-${row['Resource Name']}`, // Create a simple unique ID
                             resourceName: String(row['Resource Name'] || '').trim(),
-                            link: String(row['Link'] || '').trim(),
+                            link: normalizeUrl(rawLink),
                             publisher: String(row['Publisher'] || 'N/A').trim(),
                             stat: String(row['Stat'] || '').trim(),
                             tags,
