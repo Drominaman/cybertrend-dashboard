@@ -1,0 +1,6 @@
+{
+  "name": "Cybersecurity Trends Dashboard",
+  "description": "An interactive dashboard to explore and filter cybersecurity trends by company, topic, and technology. Data is sourced live from a public database.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

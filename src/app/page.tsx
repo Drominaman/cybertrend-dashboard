@@ -1,19 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Papa from "papaparse";
-import { Bar } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  BarElement,
-  CategoryScale,
-  LinearScale,
-  Tooltip,
-  Legend,
-} from "chart.js";
 import { Analytics } from "@vercel/analytics/react";
+import Link from 'next/link';
 
-ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 const extractKeywords = (text: string) => {
   const stopWords = ["the", "and", "for", "with", "that", "from", "this", "into", "when", "are"];
@@ -31,6 +22,7 @@ type DataPoint = {
   sector: string;
   topic: string;
   date: string;
+  parsedDate?: Date | null;
   link: string;
   keywords: string[];
 };
@@ -47,113 +39,200 @@ function parseDateEUFormat(dateStr: string): Date | null {
   return null;
 }
 
+// Simple debounce implementation to avoid external dependency
+function debounce<T extends (...args: any[]) => void>(func: T, wait: number): T {
+  let timeout: ReturnType<typeof setTimeout>;
+  return ((...args: any[]) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  }) as T;
+}
+
 export default function Page() {
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<keyof DataPoint | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedTopic, setSelectedTopic] = useState("All");
   const [search, setSearch] = useState("");
   const [selectedStat, setSelectedStat] = useState<DataPoint | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const itemsPerPageOptions = [10, 25, 50, 100];
+  const [itemsPerPage, setItemsPerPage] = useState<number>(10);
+  const clearAllFilters = useCallback(() => {
+    setSelectedSource(null);
+    setSelectedSector(null);
+    setSelectedDateFilter("");
+    setSelectedTopic("All");
+    setCurrentPage(1);
+  }, []);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [selectedDateFilter, setSelectedDateFilter] = useState("");
 
-  const topics = ["All", ...Array.from(new Set(dataPoints.map((d) => d.topic)))];
+  const csvUrl =
+    "https://docs.google.com/spreadsheets/d/e/2PACX-1vRcLWviAhPQSQ1iKYxFF1EjVpIWpzKv-Hfsw3KXPnvwMLA_F42y5aHAGhBJnHimMgeYoUqorn5WKqvH/pub?output=csv";
 
-  const topicCounts = dataPoints.reduce((acc, d) => {
-    acc[d.topic] = (acc[d.topic] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // Debounced search setter
+  const debouncedSetSearch = useMemo(
+    () =>
+      debounce((val: string) => {
+        setSearch(val);
+        setCurrentPage(1);
+        localStorage.setItem(
+          'trendFilters',
+          JSON.stringify({
+            source: selectedSource,
+            sector: selectedSector,
+            date: selectedDateFilter,
+            topic: selectedTopic,
+            search: val,
+            sortField,
+            sortOrder,
+          })
+        );
+      }, 300),
+    [selectedSource, selectedSector, selectedDateFilter, selectedTopic, sortField, sortOrder]
+  );
+
+  // Load data function for reuse (e.g. retry)
+  const loadData = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    fetch(csvUrl)
+      .then(res => res.text())
+      .then(csvText => {
+        Papa.parse(csvText, {
+          header: true,
+          complete: result => {
+            const parsedData: DataPoint[] = result.data
+              .filter((row: any) => row["Stat"] && row["Publisher"]?.trim())
+              .map((row: any, index: number) => ({
+                id: index.toString(),
+                summary: row["Stat"].trim(),
+                source: row["Publisher"].trim(),
+                sector: row["Tag 1"]?.trim() || "N/A",
+                topic:
+                  row["Tag 2"]?.trim() ||
+                  row["Tag 3"]?.trim() ||
+                  row["Tag 4"]?.trim() ||
+                  row["Tag 5"]?.trim() ||
+                  "General",
+                date: row["Date"]?.trim() || "Unknown",
+                parsedDate: parseDateEUFormat(row["Date"]?.trim()),
+                link: row["Link"]?.trim() || "",
+                keywords: extractKeywords(row["Stat"] || ""),
+              }));
+            setDataPoints(parsedData);
+            setLoading(false);
+            if (window.location.hash.startsWith("#stat=")) {
+              const id = window.location.hash.split("=")[1];
+              const match = parsedData.find(d => d.id === id);
+              if (match) {
+                setSelectedStat(match);
+                setShowModal(true);
+              }
+            }
+          },
+        });
+      })
+      .catch(e => {
+        setError(e.message || "Unknown error");
+        setLoading(false);
+      });
+  }, [csvUrl]);
 
   useEffect(() => {
-    const csvUrl =
-      "https://docs.google.com/spreadsheets/d/e/2PACX-1vRcLWviAhPQSQ1iKYxFF1EjVpIWpzKv-Hfsw3KXPnvwMLA_F42y5aHAGhBJnHimMgeYoUqorn5WKqvH/pub?output=csv";
-
-    const fetchData = () => {
-      fetch(csvUrl)
-        .then((res) => res.text())
-        .then((csvText) => {
-          Papa.parse(csvText, {
-            header: true,
-            complete: (result) => {
-              const parsedData: DataPoint[] = result.data
-                .filter((row: any) => row["Stat"] && row["Publisher"]?.trim())
-                .map((row: any, index: number) => {
-                  return {
-                    id: index.toString(),
-                    summary: row["Stat"].trim(),
-                    source: row["Publisher"].trim(),
-                    sector: row["Tag 1"]?.trim() || "N/A",
-                    topic:
-                      row["Tag 2"]?.trim() ||
-                      row["Tag 3"]?.trim() ||
-                      row["Tag 4"]?.trim() ||
-                      row["Tag 5"]?.trim() ||
-                      "General",
-                    date: row["Date"]?.trim() || "Unknown",
-                    link: row["Link"]?.trim() || "",
-                    keywords: extractKeywords(row["Stat"] || ""),
-                  };
-                });
-              setDataPoints(parsedData);
-              const hash = window.location.hash;
-              if (hash.startsWith("#stat=")) {
-                const id = hash.split("=")[1];
-                const match = parsedData.find((d) => d.id === id);
-                if (match) {
-                  setSelectedStat(match);
-                  setShowModal(true);
-                }
-              }
-            },
-          });
-        });
-    };
-
-    fetchData();
-    const interval = setInterval(fetchData, 1000 * 60 * 60 * 5); // refresh every 5 hours
+    const stored = localStorage.getItem('trendFilters');
+    if (stored) {
+      try {
+        const { source, sector, date, topic, search: s, sortField: sf, sortOrder: so } = JSON.parse(stored);
+        if (source) setSelectedSource(source);
+        if (sector) setSelectedSector(sector);
+        if (date) setSelectedDateFilter(date);
+        if (topic) setSelectedTopic(topic);
+        if (s) setSearch(s);
+        if (sf) setSortField(sf);
+        if (so) setSortOrder(so);
+      } catch {}
+    }
+    loadData();
+    const interval = setInterval(loadData, 1000 * 60 * 60 * 5);
     return () => clearInterval(interval);
-  }, []);
+  }, [csvUrl, loadData]);
 
-  const filteredData = dataPoints.filter(
-    (d) =>
-      (!selectedSource || d.source === selectedSource) &&
-      (selectedTopic === "All" || d.topic === selectedTopic) &&
-      (!selectedSector || d.sector === selectedSector) &&
-      (selectedDateFilter === "" ||
-        (() => {
-          const parsed = parseDateEUFormat(d.date);
-          let normalized = "";
-          if (parsed && !isNaN(parsed.getTime())) {
-            normalized = parsed.toISOString().slice(0, 7);
-          }
-          return normalized === selectedDateFilter;
-        })()) &&
-      (d.summary.toLowerCase().includes(search.toLowerCase()) ||
-        d.source.toLowerCase().includes(search.toLowerCase()) ||
-        d.topic.toLowerCase().includes(search.toLowerCase()))
+  const topics = useMemo(() => ['All', ...Array.from(new Set(dataPoints.map(d => d.topic)))], [dataPoints]);
+
+  const topicCounts = useMemo(
+    () =>
+      dataPoints.reduce((acc, d) => {
+        acc[d.topic] = (acc[d.topic] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+    [dataPoints]
   );
 
-  const sortedData = filteredData;
+  const filteredData = useMemo(
+    () =>
+      dataPoints.filter(
+        (d) =>
+          (!selectedSource || d.source === selectedSource) &&
+          (selectedTopic === "All" || d.topic === selectedTopic) &&
+          (!selectedSector || d.sector === selectedSector) &&
+          (selectedDateFilter === "" ||
+            (() => {
+              const parsed = d.parsedDate ?? parseDateEUFormat(d.date);
+              let normalized = "";
+              if (parsed && !isNaN(parsed.getTime())) {
+                normalized = parsed.toISOString().slice(0, 7);
+              }
+              return normalized === selectedDateFilter;
+            })()) &&
+          (d.summary.toLowerCase().includes(search.toLowerCase()) ||
+            d.source.toLowerCase().includes(search.toLowerCase()) ||
+            d.topic.toLowerCase().includes(search.toLowerCase()))
+      ),
+    [dataPoints, selectedSource, selectedSector, selectedDateFilter, selectedTopic, search]
+  );
 
-  const paginatedData = sortedData.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+  const sortedData = useMemo(() => {
+    if (!sortField) return filteredData;
+    return [...filteredData].sort((a, b) => {
+      const aVal = sortField === 'parsedDate' ? (a.parsedDate?.getTime() || 0) : (a[sortField] as string);
+      const bVal = sortField === 'parsedDate' ? (b.parsedDate?.getTime() || 0) : (b[sortField] as string);
+      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredData, sortField, sortOrder]);
+
+  const paginatedData = useMemo(
+    () => sortedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+    [sortedData, currentPage, itemsPerPage]
   );
 
 
-  if (!dataPoints.length) {
+
+  if (loading) {
+    return <main role="status" aria-label="Loading trends">Loading...</main>;
+  }
+  if (error) {
     return (
-      <main className="p-4 max-w-5xl mx-auto text-center text-gray-500">
-        Loading trends...
+      <main role="alert">
+        Error loading trends: {error}
+        <button onClick={() => loadData()}>Retry</button>
       </main>
     );
   }
 
   return (
     <main className="p-4 max-w-5xl mx-auto bg-white text-black">
+      <Link href="/publishers" className="text-blue-600 underline mb-4 inline-block">
+        View Stats per Publisher
+      </Link>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select
           className="border px-3 py-2 rounded text-sm"
@@ -163,7 +242,7 @@ export default function Page() {
             setCurrentPage(1);
           }}
         >
-          <option value="">All Topics</option>
+          <option value="">All Industries</option>
           {[...new Set(dataPoints.map((d) => d.sector))].map((sector) => (
             <option key={sector as string} value={sector as string}>
               {sector}
@@ -217,31 +296,65 @@ export default function Page() {
           type="text"
           placeholder="Search for data"
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setCurrentPage(1);
-            localStorage.setItem("trendFilters", JSON.stringify({
-              source: selectedSource,
-              topic: selectedTopic,
-              date: selectedDateFilter,
-              search: e.target.value,
-              // remove sortOrder from the filters
-            }));
-          }}
+          onChange={e => debouncedSetSearch(e.target.value)}
           className="border px-3 py-2 rounded flex-1 min-w-[200px]"
+          aria-label="Search statistics"
         />
         <button className="bg-gray-800 text-white px-3 py-2 rounded">
           🔍
         </button>
+        <select
+          className="border px-3 py-2 rounded text-sm"
+          value={itemsPerPage}
+          onChange={e => {
+            setItemsPerPage(Number(e.target.value));
+            setCurrentPage(1);
+          }}
+        >
+          {itemsPerPageOptions.map(opt => (
+            <option key={opt} value={opt}>{opt} rows/page</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        {selectedTopic !== 'All' && (
+          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full cursor-pointer" onClick={() => setSelectedTopic('All')}>
+            Topic: {selectedTopic} ×
+          </span>
+        )}
+        {selectedSource && (
+          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full cursor-pointer" onClick={() => setSelectedSource(null)}>
+            Publisher: {selectedSource} ×
+          </span>
+        )}
+        {selectedSector && (
+          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full cursor-pointer" onClick={() => setSelectedSector(null)}>
+            Industry: {selectedSector} ×
+          </span>
+        )}
+        {selectedDateFilter && (
+          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full cursor-pointer" onClick={() => setSelectedDateFilter('')}>
+            Date: {selectedDateFilter} ×
+          </span>
+        )}
+        {((selectedTopic !== 'All') || selectedSource || selectedSector || selectedDateFilter) && (
+          <button
+            onClick={clearAllFilters}
+            className="px-3 py-1 bg-red-200 text-red-800 rounded-full"
+          >
+            Clear All Filters
+          </button>
+        )}
       </div>
 
       <button
         disabled={selectedIds.size === 0}
         onClick={() => {
           const selectedData = Array.from(selectedIds)
-            .map((i) => dataPoints[i])
+            .map((id) => dataPoints.find((d) => d.id === id))
             .filter(Boolean);
-          const csv = Papa.unparse(selectedData);
+          const csv = Papa.unparse(selectedData as DataPoint[]);
           const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
           const url = URL.createObjectURL(blob);
           const link = document.createElement("a");
@@ -292,45 +405,54 @@ export default function Page() {
             <th className="border border-black p-2 text-black">
               <input
                 type="checkbox"
-                checked={
-                  paginatedData.length > 0 &&
-                  paginatedData.every((_, i) =>
-                    selectedIds.has(i + (currentPage - 1) * itemsPerPage)
-                  )
-                }
-                onChange={(e) => {
+                checked={paginatedData.length > 0 && paginatedData.every(d => selectedIds.has(d.id))}
+                onChange={e => {
                   const updated = new Set(selectedIds);
-                  paginatedData.forEach((_, i) => {
-                    const index = i + (currentPage - 1) * itemsPerPage;
+                  paginatedData.forEach(d => {
                     if (e.target.checked) {
-                      updated.add(index);
+                      updated.add(d.id);
                     } else {
-                      updated.delete(index);
+                      updated.delete(d.id);
                     }
                   });
                   setSelectedIds(updated);
                 }}
               />
             </th>
-            <th className="border border-black p-2 text-black">Source</th>
+            <th
+              className="border border-black p-2 text-black cursor-pointer select-none"
+              onClick={() => {
+                setSortField('source');
+                setSortOrder(sortField === 'source' && sortOrder === 'asc' ? 'desc' : 'asc');
+              }}
+            >
+              Source {sortField === 'source' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+            </th>
             <th className="border border-black p-2 text-black">Summary</th>
-            <th className="border border-black p-2 text-black">Published</th>
+            <th
+              className="border border-black p-2 text-black cursor-pointer select-none"
+              onClick={() => {
+                setSortField('parsedDate');
+                setSortOrder(sortField === 'parsedDate' && sortOrder === 'asc' ? 'desc' : 'asc');
+              }}
+            >
+              Published {sortField === 'parsedDate' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+            </th>
           </tr>
         </thead>
         <tbody>
           {paginatedData.map((d, i) => (
-            <tr key={i} className="hover:bg-blue-50 transition-colors cursor-pointer">
+            <tr key={d.id} className="hover:bg-blue-50 transition-colors cursor-pointer">
               <td className="border border-black p-2">
                 <input
                   type="checkbox"
-                  checked={selectedIds.has(i + (currentPage - 1) * itemsPerPage)}
+                  checked={selectedIds.has(d.id)}
                   onChange={() => {
-                    const index = i + (currentPage - 1) * itemsPerPage;
                     const updated = new Set(selectedIds);
-                    if (updated.has(index)) {
-                      updated.delete(index);
+                    if (updated.has(d.id)) {
+                      updated.delete(d.id);
                     } else {
-                      updated.add(index);
+                      updated.add(d.id);
                     }
                     setSelectedIds(updated);
                   }}
@@ -356,7 +478,7 @@ export default function Page() {
               </td>
               <td className="border border-black p-2">
                 {(() => {
-                  const parsed = parseDateEUFormat(d.date);
+                  const parsed = d.parsedDate ?? parseDateEUFormat(d.date);
                   if (parsed && !isNaN(parsed.getTime())) {
                     return parsed.toLocaleDateString("en-US", { month: "long", year: "numeric" });
                   }
@@ -397,8 +519,13 @@ export default function Page() {
             className="fixed inset-0 bg-transparent z-40"
             onClick={() => setShowModal(false)}
           />
-          <div className="fixed z-50 bg-white text-black p-4 shadow-lg rounded max-w-md w-fit mx-auto left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
-            <h2 className="text-xl font-bold mb-4">Stat Detail</h2>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="statDetailTitle"
+            className="fixed z-50 bg-white text-black p-4 shadow-lg rounded max-w-md w-fit mx-auto left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2"
+          >
+            <h2 id="statDetailTitle" className="text-xl font-bold mb-4">Stat Detail</h2>
             <p className="mb-2">
               <strong>Stat:</strong> {selectedStat.summary}
             </p>
@@ -408,7 +535,7 @@ export default function Page() {
             <p className="mb-2">
               <strong>Published:</strong>{" "}
               {(() => {
-                const parsed = parseDateEUFormat(selectedStat.date);
+                const parsed = selectedStat.parsedDate ?? parseDateEUFormat(selectedStat.date);
                 if (parsed && !isNaN(parsed.getTime())) {
                   return parsed.toLocaleDateString("en-US", { month: "long", year: "numeric" });
                 }
