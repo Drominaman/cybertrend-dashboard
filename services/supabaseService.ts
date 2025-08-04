@@ -1,10 +1,7 @@
 import { TrendItem, FilterOptions } from '../types';
 
-const SUPABASE_URL =
-  import.meta.env.NEXT_PUBLIC_SUPABASE_URL ?? import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY =
-  import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??
-  import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL = import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
 export const hasSupabaseConfig = !!(SUPABASE_URL && SUPABASE_KEY);
 
@@ -13,7 +10,7 @@ export const fetchSupabaseData = async (): Promise<{
   filterOptions: FilterOptions;
 }> => {
   if (!hasSupabaseConfig) {
-    throw new Error('Supabase URL or anonymous key is not set');
+    throw new Error('Supabase URL or publishable key is not set');
   }
 
   const url = `${SUPABASE_URL}/rest/v1/trends?select=*`;
