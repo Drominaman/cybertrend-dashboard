@@ -1,7 +1,6 @@
-import React from 'react';
 import { ChartBarIcon } from './icons';
 
-const Header: React.FC = () => {
+const Header = () => {
   return (
     <header className="py-6 sm:py-8">
       <div className="flex items-center justify-center space-x-4">
