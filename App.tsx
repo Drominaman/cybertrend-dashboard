@@ -1,7 +1,7 @@
 
 
 
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TrendItem, FilterOptions, Filters, DateFilterOption } from './types';
 import Header from './components/Header';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -21,7 +21,7 @@ const RESULTS_PER_PAGE = 5;
  * @returns A Date object for sorting. Unsortable strings result in an old date.
  */
 const getSortableDate = (dateString: string): Date => {
-    // Standard YYYY-MM format (month is 0-indexed in key)
+    // Standard YYYY-MM format (month is 1-indexed)
     const yyyyMmMatch = dateString.match(/^(\d{4})-(\d{2})$/);
     if (yyyyMmMatch) {
         // new Date(year, monthIndex, day)
@@ -69,7 +69,7 @@ interface FilterControlsProps {
   onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-const FilterControls: React.FC<FilterControlsProps> = ({
+const FilterControls = ({
   filters,
   filterOptions,
   onFilterChange,
@@ -77,7 +77,7 @@ const FilterControls: React.FC<FilterControlsProps> = ({
   dateFilterOptions,
   searchKeyword,
   onSearchChange,
-}) => (
+}: FilterControlsProps) => (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 my-6 backdrop-blur-sm">
          <div className="mb-5">
             <label htmlFor="search-input" className="block text-sm font-medium text-slate-300 mb-1">Search by Keyword</label>
@@ -168,13 +168,13 @@ const FilterControls: React.FC<FilterControlsProps> = ({
 interface PaginationControlsProps {
     currentPage: number;
     totalPages: number;
-    setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+    setCurrentPage: (value: number | ((prev: number) => number)) => void;
 }
 
-const PaginationControls: React.FC<PaginationControlsProps> = ({ currentPage, totalPages, setCurrentPage }) => (
+const PaginationControls = ({ currentPage, totalPages, setCurrentPage }: PaginationControlsProps) => (
     <div className="flex justify-center items-center gap-4 mt-8">
       <button
-        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+        onClick={() => setCurrentPage((p: number) => Math.max(1, p - 1))}
         disabled={currentPage === 1}
         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
       >
@@ -184,7 +184,7 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({ currentPage, to
         Page {currentPage} of {totalPages > 0 ? totalPages : 1}
       </span>
       <button
-        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+        onClick={() => setCurrentPage((p: number) => Math.min(totalPages, p + 1))}
         disabled={currentPage === totalPages || totalPages === 0}
         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
       >
@@ -196,7 +196,7 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({ currentPage, to
 
 // --- Main App Component ---
 
-const App: React.FC = () => {
+const App = () => {
   const [allTrends, setAllTrends] = useState<TrendItem[]>([]);
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({ publishers: [], tags: [], locations: [] });
   const [filters, setFilters] = useState<Filters>({ publisher: 'all', tag: 'all', dateRange: 'all', location: 'all' });
@@ -232,11 +232,11 @@ const App: React.FC = () => {
 
     const dateOptionsMap = new Map<string, string>();
 
-    allTrends.forEach(trend => {
+    allTrends.forEach((trend: TrendItem) => {
         if (trend.datePublished) {
             const date = trend.datePublished;
             const year = date.getUTCFullYear();
-            const month = date.getUTCMonth(); // 0-indexed
+            const month = date.getUTCMonth() + 1; // 1-12
             const key = `${year}-${String(month).padStart(2, '0')}`;
             
             if (!dateOptionsMap.has(key)) {
@@ -265,7 +265,7 @@ const App: React.FC = () => {
   const filteredTrends = useMemo(() => {
     const lowercasedKeyword = searchKeyword.toLowerCase();
     
-    return allTrends.filter(trend => {
+    return allTrends.filter((trend: TrendItem) => {
       const publisherMatch = filters.publisher === 'all' || trend.publisher === filters.publisher;
       const tagMatch = filters.tag === 'all' || trend.tags.includes(filters.tag);
       const locationMatch = filters.location === 'all' || trend.locations.includes(filters.location);
@@ -283,7 +283,7 @@ const App: React.FC = () => {
             if (trend.datePublished) {
                 const date = trend.datePublished;
                 const year = date.getUTCFullYear();
-                const month = date.getUTCMonth();
+                const month = date.getUTCMonth() + 1;
                 const trendKey = `${year}-${String(month).padStart(2, '0')}`;
                 dateMatch = trendKey === filterValue;
             } else {
@@ -303,7 +303,7 @@ const App: React.FC = () => {
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
+    setFilters((prev: Filters) => ({ ...prev, [name]: value }));
     setCurrentPage(1);
   };
   
@@ -319,7 +319,7 @@ const App: React.FC = () => {
   };
 
   const handleTagSelect = (tagName: string) => {
-    setFilters(prev => ({ ...prev, tag: tagName }));
+    setFilters((prev: Filters) => ({ ...prev, tag: tagName }));
     setView('list');
     setCurrentPage(1);
   };
@@ -377,7 +377,11 @@ const App: React.FC = () => {
 
                   {paginatedTrends.length > 0 ? (
                     <div className="space-y-6">
-                      {paginatedTrends.map(item => <ResultCard key={item.id} item={item} />)}
+                      {paginatedTrends.map((item: TrendItem) => (
+                        <div key={item.id}>
+                          <ResultCard item={item} />
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="text-center py-16 px-6 bg-slate-800 rounded-xl">
