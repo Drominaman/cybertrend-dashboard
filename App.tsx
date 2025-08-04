@@ -21,7 +21,7 @@ const RESULTS_PER_PAGE = 5;
  * @returns A Date object for sorting. Unsortable strings result in an old date.
  */
 const getSortableDate = (dateString: string): Date => {
-    // Standard YYYY-MM format (month is 0-indexed in key)
+    // Standard YYYY-MM format (month is 1-indexed)
     const yyyyMmMatch = dateString.match(/^(\d{4})-(\d{2})$/);
     if (yyyyMmMatch) {
         // new Date(year, monthIndex, day)
@@ -236,7 +236,7 @@ const App: React.FC = () => {
         if (trend.datePublished) {
             const date = trend.datePublished;
             const year = date.getUTCFullYear();
-            const month = date.getUTCMonth(); // 0-indexed
+            const month = date.getUTCMonth() + 1; // 1-12
             const key = `${year}-${String(month).padStart(2, '0')}`;
             
             if (!dateOptionsMap.has(key)) {
@@ -283,7 +283,7 @@ const App: React.FC = () => {
             if (trend.datePublished) {
                 const date = trend.datePublished;
                 const year = date.getUTCFullYear();
-                const month = date.getUTCMonth();
+                const month = date.getUTCMonth() + 1;
                 const trendKey = `${year}-${String(month).padStart(2, '0')}`;
                 dateMatch = trendKey === filterValue;
             } else {
