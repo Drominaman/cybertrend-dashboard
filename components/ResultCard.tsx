@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { TrendItem } from '../types';
 import { LinkIcon, BuildingOfficeIcon, CalendarDaysIcon } from './icons';
 
@@ -12,7 +12,7 @@ interface ResultCardProps {
   item: TrendItem;
 }
 
-const ResultCard: React.FC<ResultCardProps> = ({ item }) => {
+const ResultCard = ({ item }: ResultCardProps) => {
   const { stat, resourceName, publisher, tags, link, notes, datePublished, originalDateString } = item;
 
   const displayDate = useMemo(() => {

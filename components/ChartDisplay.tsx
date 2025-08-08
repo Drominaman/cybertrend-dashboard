@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { TrendItem } from '../types';
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar, CartesianGrid } from 'recharts';
 import { ChartBarIcon } from './icons';
@@ -55,7 +55,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({ trends, onTagSelect }) => {
                                     name="Mentions"
                                     fill="#60a5fa" 
                                     barSize={20}
-                                    onClick={(data) => onTagSelect(data.name)}
+                                    onClick={(data: any) => onTagSelect(data.name)}
                                     style={{ cursor: 'pointer' }}
                                 />
                             </BarChart>
