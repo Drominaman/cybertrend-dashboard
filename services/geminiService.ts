@@ -19,6 +19,7 @@ function normalizeUrl(raw: string): string {
 import Papa from 'papaparse';
 import { TrendItem, FilterOptions } from '../types';
 import { countries } from './locationData';
+import { fetchSupabaseData, hasSupabaseConfig } from './supabaseService';
 
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS7IAyOqipa4SWgcKEiGgma10TlwS5G9knkq0-E-_dvnuualiNR81yreifFISTuZtGu467l8JhROl86/pub?output=csv';
 
@@ -48,20 +49,23 @@ const findLocationsInText = (text: string): string[] => {
 
 
 export const fetchDashboardData = async (): Promise<{ trends: TrendItem[]; filterOptions: FilterOptions }> => {
+    if (hasSupabaseConfig) {
+        return fetchSupabaseData();
+    }
     return new Promise((resolve, reject) => {
         Papa.parse(SHEET_URL, {
             download: true,
             header: true,
             skipEmptyLines: true,
-            complete: (results) => {
+            complete: (results: Papa.ParseResult<any>) => {
                 if (results.errors.length) {
                     return reject(new Error(`CSV parsing error: ${results.errors[0].message}.`));
                 }
 
-                const headers = results.meta.fields;
+                const headers = results.meta.fields as string[] | undefined;
                 // Dynamically detect the header used for link URLs
-                const linkKey = headers?.find(h => h === 'Link') || headers?.find(h => /link/i.test(h) || /url/i.test(h));
-                if (!headers || !REQUIRED_HEADERS.every(h => headers.includes(h))) {
+                const linkKey = headers?.find((h: string) => h === 'Link') || headers?.find((h: string) => /link/i.test(h) || /url/i.test(h));
+                if (!headers || !REQUIRED_HEADERS.every((h: string) => headers.includes(h))) {
                     return reject(new Error(`CSV is missing required headers. Found: ${headers?.join(', ')}. Required: ${REQUIRED_HEADERS.join(', ')}`));
                 }
 
