@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { TrendData } from '../types';
 import { TrendCard } from './TrendCard';
 import { SearchIcon, InfoIcon } from './Icons';
@@ -15,12 +14,30 @@ const RESULTS_PER_PAGE = 10;
 export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ data, searchTerm, onSearchTermChange }) => {
     const [currentPage, setCurrentPage] = useState(1);
 
+    const [hideUntagged, setHideUntagged] = useState(false);
+
+    // Treat having any tags/topics/technology as "tagged". Supports several shapes.
+    const hasAnyTag = (t: TrendData) => {
+        const any: any = t as any;
+        const candidates = [any.tags, any.Tags, any.tag_list, any.Topic, any.topics, any.Technology];
+        for (const c of candidates) {
+            if (Array.isArray(c) && c.filter(Boolean).length > 0) return true;
+            if (typeof c === 'string' && c.trim().length > 0) return true;
+        }
+        return false;
+    };
+
     useEffect(() => {
         setCurrentPage(1);
     }, [data, searchTerm]);
 
-    const totalPages = Math.ceil(data.length / RESULTS_PER_PAGE);
-    const paginatedData = data.slice(
+    const filteredData = useMemo(() => (
+        hideUntagged ? data.filter(hasAnyTag) : data
+    ), [data, hideUntagged]);
+
+    const totalPages = Math.ceil(filteredData.length / RESULTS_PER_PAGE) || 1;
+
+    const paginatedData = filteredData.slice(
         (currentPage - 1) * RESULTS_PER_PAGE,
         currentPage * RESULTS_PER_PAGE
     );
@@ -46,12 +63,21 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ data, searchTerm
                 />
             </div>
 
-            {data.length > 0 ? (
+            {filteredData.length > 0 ? (
                 <>
                     <div className="mb-4 flex justify-between items-center">
                         <h3 className="text-xl font-semibold text-slate-200">
-                            Results <span className="text-base font-normal text-slate-400">({data.length} found)</span>
+                            Results <span className="text-base font-normal text-slate-400">({filteredData.length} found)</span>
                         </h3>
+                        <label className="ml-auto mr-4 inline-flex items-center gap-2 text-sm text-slate-300">
+                            <input
+                                type="checkbox"
+                                checked={hideUntagged}
+                                onChange={(e) => setHideUntagged(e.target.checked)}
+                                className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500"
+                            />
+                            Hide items with no tags
+                        </label>
                          {totalPages > 1 && (
                             <div className="flex items-center space-x-2 text-sm">
                                 <button
