@@ -59,20 +59,6 @@ export const StatDetailModal: React.FC<StatDetailModalProps> = ({ stat, onClose 
                     <CardInfoRow icon={<CpuIcon />} label="Technology" value={stat.Technology} />
                     <CardInfoRow icon={<CalendarIcon />} label="Date" value={stat.Date} />
                 </div>
-
-                {stat.Source && (
-                    <div className="mt-6 pt-4 border-t border-slate-700">
-                        <a
-                            href={stat.Source}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center text-sm text-cyan-400 hover:text-cyan-300 hover:underline transition-colors"
-                        >
-                            <LinkIcon className="w-4 h-4 mr-2" />
-                            View Source
-                        </a>
-                    </div>
-                )}
             </div>
              <style>{`
                 @keyframes fade-in-up {
