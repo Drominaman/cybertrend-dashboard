@@ -2,10 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { TrendData, FilterOptions } from './types';
 import { fetchAndParseData } from './services/dataService';
 import { Header } from './components/Header';
-import { LoaderIcon, InfoIcon, SearchIcon } from './components/Icons';
+import { LoaderIcon, InfoIcon } from './components/Icons';
 import { StatsTable } from './components/StatsTable';
 import { StatDetailModal } from './components/StatDetailModal';
 import { FilterSidebar } from './components/FilterSidebar';
+import { GuidedFilterSearch } from './components/GuidedFilterSearch';
+import { FilteredInsights } from './components/FilteredInsights';
 
 const App: React.FC = () => {
     const [allData, setAllData] = useState<TrendData[]>([]);
@@ -16,7 +18,6 @@ const App: React.FC = () => {
     const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
     const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
     const [selectedDates, setSelectedDates] = useState<string[]>([]);
-    const [searchTerm, setSearchTerm] = useState('');
 
     // Modal State
     const [selectedStat, setSelectedStat] = useState<TrendData | null>(null);
@@ -59,18 +60,16 @@ const App: React.FC = () => {
             const topicMatch = selectedTopics.length === 0 || selectedTopics.includes(item.Topic);
             const companyMatch = selectedCompanies.length === 0 || selectedCompanies.includes(item.Company);
             const dateMatch = selectedDates.length === 0 || selectedDates.includes(item.Date);
-            
-            const searchLower = searchTerm.toLowerCase();
-            const termMatch = searchTerm === '' ||
-                item.stat.toLowerCase().includes(searchLower) ||
-                item.ResourceName.toLowerCase().includes(searchLower) ||
-                item.Company.toLowerCase().includes(searchLower) ||
-                item.Topic.toLowerCase().includes(searchLower) ||
-                item.Technology.toLowerCase().includes(searchLower);
 
-            return topicMatch && companyMatch && dateMatch && termMatch;
+            return topicMatch && companyMatch && dateMatch;
         });
-    }, [allData, selectedTopics, selectedCompanies, selectedDates, searchTerm]);
+    }, [allData, selectedTopics, selectedCompanies, selectedDates]);
+
+    const hasActiveFilters = useMemo(() => (
+        selectedTopics.length > 0 ||
+        selectedCompanies.length > 0 ||
+        selectedDates.length > 0
+    ), [selectedTopics, selectedCompanies, selectedDates]);
 
     const handleStatSelect = (stat: TrendData) => {
         setSelectedStat(stat);
@@ -88,7 +87,11 @@ const App: React.FC = () => {
         setSelectedTopics([]);
         setSelectedCompanies([]);
         setSelectedDates([]);
-        setSearchTerm('');
+    };
+
+    const handleGuidedFilterApply = (topic: string | null, date: string | null) => {
+        setSelectedTopics(topic ? [topic] : []);
+        setSelectedDates(date ? [date] : []);
     };
 
     if (isDataLoading) {
@@ -123,27 +126,24 @@ const App: React.FC = () => {
                     onResetFilters={handleResetFilters}
                 />
                 <div className="flex-1 min-w-0">
+                    <GuidedFilterSearch
+                        filterOptions={filterOptions}
+                        onApply={handleGuidedFilterApply}
+                        currentTopic={selectedTopics[0] ?? null}
+                        currentDate={selectedDates[0] ?? null}
+                    />
                     <div id="results-section">
-                        <div className="relative mb-4">
-                            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Search by keyword, resource, company..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-12 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
-                            />
-                        </div>
                         <h3 className="text-xl font-semibold text-slate-200 mb-4">
                             Browse Database <span className="text-base font-normal text-slate-400">({filteredData.length} stats found)</span>
                         </h3>
+                        <FilteredInsights filteredData={filteredData} hasActiveFilters={hasActiveFilters} />
                         {filteredData.length > 0 ? (
                             <StatsTable stats={filteredData} onStatSelect={handleStatSelect} />
                         ) : (
                             <div className="flex flex-col items-center justify-center text-center p-12 bg-slate-800/50 rounded-lg border border-slate-700">
                                 <InfoIcon className="w-12 h-12 text-slate-500 mb-4" />
                                 <h3 className="text-xl font-semibold text-slate-200">No Results Found</h3>
-                                <p className="text-slate-400 mt-2">Try adjusting your filters or search term.</p>
+                                <p className="text-slate-400 mt-2">Try adjusting your filters or guided search selections.</p>
                             </div>
                         )}
                     </div>

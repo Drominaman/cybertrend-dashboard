@@ -137,6 +137,13 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                     selectedOptions={selectedCompanies}
                     onToggle={onCompanyToggle}
                 />
+                <DropdownFilter
+                    label="Date"
+                    icon={<CalendarIcon className="w-4 h-4 text-slate-400" />}
+                    options={filterOptions.dates}
+                    selectedOptions={selectedDates}
+                    onToggle={onDateToggle}
+                />
               
                 <div className="flex flex-col space-y-3 mt-4 border-t border-slate-700 pt-6">
                     <button
