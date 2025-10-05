@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { FilterOptions } from '../types';
-import { 
-    FilterIcon, RefreshCwIcon, TagIcon, BuildingIcon, 
-    CalendarIcon, SearchIcon, ChevronDownIcon, ChevronUpIcon, XIcon 
+import {
+    FilterIcon, RefreshCwIcon, TagIcon, BuildingIcon,
+    SearchIcon, ChevronDownIcon, ChevronUpIcon, XIcon
 } from './Icons';
 
 interface FilterSidebarProps {
@@ -12,8 +12,6 @@ interface FilterSidebarProps {
     onTopicToggle: (value: string) => void;
     selectedCompanies: string[];
     onCompanyToggle: (value: string) => void;
-    selectedDates: string[];
-    onDateToggle: (value: string) => void;
     onResetFilters: () => void;
 }
 
@@ -113,8 +111,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     onTopicToggle,
     selectedCompanies,
     onCompanyToggle,
-    selectedDates,
-    onDateToggle,
     onResetFilters
 }) => {
     

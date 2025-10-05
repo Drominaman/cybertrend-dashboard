@@ -15,7 +15,6 @@ const App: React.FC = () => {
     // Client-side Filter State
     const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
     const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
-    const [selectedDates, setSelectedDates] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
 
     // Modal State
@@ -41,16 +40,13 @@ const App: React.FC = () => {
     const filterOptions = useMemo<FilterOptions>(() => {
         const topics = new Set<string>();
         const companies = new Set<string>();
-        const dates = new Set<string>();
         allData.forEach(item => {
             if (item.Topic) topics.add(item.Topic);
             if (item.Company) companies.add(item.Company);
-            if (item.Date) dates.add(item.Date);
         });
         return {
             topics: Array.from(topics).sort(),
             companies: Array.from(companies).sort(),
-            dates: Array.from(dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()),
         };
     }, [allData]);
 
@@ -58,8 +54,7 @@ const App: React.FC = () => {
         return allData.filter(item => {
             const topicMatch = selectedTopics.length === 0 || selectedTopics.includes(item.Topic);
             const companyMatch = selectedCompanies.length === 0 || selectedCompanies.includes(item.Company);
-            const dateMatch = selectedDates.length === 0 || selectedDates.includes(item.Date);
-            
+
             const searchLower = searchTerm.toLowerCase();
             const termMatch = searchTerm === '' ||
                 item.stat.toLowerCase().includes(searchLower) ||
@@ -68,9 +63,9 @@ const App: React.FC = () => {
                 item.Topic.toLowerCase().includes(searchLower) ||
                 item.Technology.toLowerCase().includes(searchLower);
 
-            return topicMatch && companyMatch && dateMatch && termMatch;
+            return topicMatch && companyMatch && termMatch;
         });
-    }, [allData, selectedTopics, selectedCompanies, selectedDates, searchTerm]);
+    }, [allData, selectedTopics, selectedCompanies, searchTerm]);
 
     const handleStatSelect = (stat: TrendData) => {
         setSelectedStat(stat);
@@ -83,11 +78,9 @@ const App: React.FC = () => {
     // Filter handlers
     const handleTopicToggle = (topic: string) => setSelectedTopics(prev => prev.includes(topic) ? prev.filter(t => t !== topic) : [...prev, topic]);
     const handleCompanyToggle = (company: string) => setSelectedCompanies(prev => prev.includes(company) ? prev.filter(c => c !== company) : [...prev, company]);
-    const handleDateToggle = (date: string) => setSelectedDates(prev => prev.includes(date) ? prev.filter(d => d !== date) : [...prev, date]);
     const handleResetFilters = () => {
         setSelectedTopics([]);
         setSelectedCompanies([]);
-        setSelectedDates([]);
         setSearchTerm('');
     };
 
@@ -118,8 +111,6 @@ const App: React.FC = () => {
                     onTopicToggle={handleTopicToggle}
                     selectedCompanies={selectedCompanies}
                     onCompanyToggle={handleCompanyToggle}
-                    selectedDates={selectedDates}
-                    onDateToggle={handleDateToggle}
                     onResetFilters={handleResetFilters}
                 />
                 <div className="flex-1 min-w-0">

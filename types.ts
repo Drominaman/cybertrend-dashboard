@@ -11,5 +11,4 @@ export interface TrendData {
 export interface FilterOptions {
     topics: string[];
     companies: string[];
-    dates: string[];
 }

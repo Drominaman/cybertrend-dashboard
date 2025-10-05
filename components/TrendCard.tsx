@@ -1,9 +1,9 @@
 import React from 'react';
 import { TrendData } from '../types';
-import { BuildingIcon, CalendarIcon, LinkIcon, TagIcon, CpuIcon, InfoIcon } from './Icons';
+import { BuildingIcon, CalendarIcon, LinkIcon, TagIcon, CpuIcon } from './Icons';
 
 interface TrendCardProps {
-    trend: TrendData & { reason?: string };
+    trend: TrendData;
 }
 
 const CardInfoRow: React.FC<{ icon: React.ReactNode; label: string; value?: string }> = ({ icon, label, value }) => {
@@ -30,19 +30,6 @@ export const TrendCard: React.FC<TrendCardProps> = ({ trend }) => {
                 <CardInfoRow icon={<CpuIcon />} label="Technology" value={trend.Technology} />
                 <CardInfoRow icon={<CalendarIcon />} label="Date" value={trend.Date} />
             </div>
-
-            {trend.reason && (
-                <div className="mt-4 pt-3 border-t border-slate-700 bg-slate-900/50 p-3 rounded-md">
-                    <div className="flex items-start text-sm">
-                        <span className="text-cyan-400 w-5 h-5 flex-shrink-0 mr-2 mt-0.5"><InfoIcon /></span>
-                        <div>
-                           <p className="font-semibold text-slate-300">AI's Reason for Selection:</p>
-                           <p className="text-slate-400 italic">"{trend.reason}"</p>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {trend.Source && (
                 <div className="mt-4 pt-3 border-t border-slate-700">
                     <a
