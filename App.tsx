@@ -134,9 +134,6 @@ const App: React.FC = () => {
                                 className="w-full pl-12 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
                             />
                         </div>
-                        <h3 className="text-xl font-semibold text-slate-200 mb-4">
-                            Browse Database <span className="text-base font-normal text-slate-400">({filteredData.length} stats found)</span>
-                        </h3>
                         {filteredData.length > 0 ? (
                             <StatsTable stats={filteredData} onStatSelect={handleStatSelect} />
                         ) : (
